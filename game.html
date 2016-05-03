@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja" ng-app="myApp">
+  <head>
+    <meta charset="UTF-8">
+    <title></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no">
+    <script src="board.js"></script>
+    <script src="player.js"></script>
+    <!--script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.10/angular.min.js"></script-->
+    <script src="angular.min.js"></script>
+    <script>
+    var myApp = angular.module('myApp', []);
+    myApp.controller('board', function($scope, $timeout) {
+        var BLACK = Board.BLACK, WHITE = Board.WHITE;
+        game.board = new Board(8, 8);
+
+        var player = new Player('Player', BLACK);
+        var AI = new Player('AI', WHITE);
+        AI.think = function() {
+            var min = Infinity, max = -Infinity, X = null, Y = null;
+            var emptyCell = 0;
+            for (var x = 0; x < game.board.width; x++) {
+                for (var y = 0; y < game.board.height; y++) {
+                    if (game.board.get(x, y) === Board.EMPTY) emptyCell++;
+                }
+            }
+            for (var x = 0; x < game.board.width; x++) {
+                for (var y = 0; y < game.board.height; y++) {
+                    var stones = game.board.countChangeableStones(x, y, this.color);
+                    if (emptyCell > 40) {
+                        if (stones !== 0 && stones <= min) {
+                            X = x;
+                            Y = y;
+                            min = stones;
+                        }
+                    } else {
+                        if (stones >= max) {
+                            X = x;
+                            Y = y;
+                            max = stones;
+                        }
+                    }
+                }
+            }
+            if (X !== null && Y !== null) this.put(X, Y);
+            else this.pass();
+        };
+        game.board.change(3, 3, WHITE).change(3, 4, BLACK).change(4, 3, BLACK).change(4, 4, WHITE);
+
+        $scope.Board = Board;
+        $scope.board = game.board;
+        $scope.game = game;
+        $scope.player = player;
+
+        $scope.range = function(n) {
+            var res = [];
+            for (var i = 0; i < n; i++) res[i] = i;
+            return res;
+        };
+        $scope.put = function(x, y) {
+            if (player.put(x, y)) {
+                $timeout(function() {AI.think();}, 800);
+            }
+        };
+    }).controller('sideboard', function($scope) {
+        $scope.game = game;
+        $scope.winner = null;
+        game.listen('win', function(index) {
+            $scope.winner = game.players[index].name;
+            $scope.$apply();
+        });
+    });
+    </script>
+    <style type="text/css">
+    td {
+        background: green;
+        width: 20px;
+        height: 20px;
+        text-align: center;
+    }
+    .black {
+        color: black;
+    }
+    .white {
+        color: white;
+    }
+    .putable {
+        color: orange;
+    }
+    </style>
+  </head>
+  <body>
+    <table ng-controller="board">
+        <tr ng-repeat="x in range(board.width)">
+            <td ng-repeat="y in range(board.height)"
+                ng-click="put(x, y)"
+                ng-class="{
+                    black: board.get(x, y) === Board.BLACK,
+                    white: board.get(x, y) === Board.WHITE,
+                    putable: game.turn === player.id && board.canPut(x, y, player.color)
+                }">
+                {{board.get(x, y) === Board.EMPTY ? '□' : '●'}}
+            </td>
+        </tr>
+    </table>
+    <div ng-controller="sideboard">
+        <span ng-if="winner === null">{{game.players[game.turn].name}}'s turn</span>
+        <span ng-if="winner !== null">{{winner}} wins!</span>
+    </div>
+  </body>
+</html>
